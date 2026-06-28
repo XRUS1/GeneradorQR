@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de QR para URLs</title>
+    <link rel="stylesheet" href="css/estilo.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                </svg>
+            </div>
+            <h1>Generador QR</h1>
+            <p class="subtitle">Ingresa una URL y genera tu código QR automáticamente</p>
+        </header>
+
+        <main class="app">
+            <section class="controls">
+                <div class="input-group">
+                    <label for="qr-url">Dirección URL</label>
+                    <input type="url" id="qr-url" placeholder="https://ejemplo.com" required>
+                </div>
+
+                <div class="options-grid">
+                    <div class="input-group">
+                        <label for="qr-size">Tamaño (px)</label>
+                        <input type="number" id="qr-size" value="512" min="100" max="1000" step="10">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="qr-color">Color QR</label>
+                        <div class="color-wrapper">
+                            <input type="color" id="qr-color" value="#1a1a2e">
+                            <span class="color-value">#1a1a2e</span>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="qr-bg">Fondo</label>
+                        <div class="color-wrapper">
+                            <input type="color" id="qr-bg" value="#ffffff">
+                            <span class="color-value">#ffffff</span>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="qr-level">Corrección</label>
+                        <select id="qr-level">
+                            <option value="1">Baja (L)</option>
+                            <option value="0" selected>Media (M)</option>
+                            <option value="3">Alta (Q)</option>
+                            <option value="2">Máxima (H)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="btn-generate" class="btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                    Generar y Descargar QR
+                </button>
+            </section>
+
+            <section class="preview">
+                <div class="preview-card">
+                    <div id="qr-container" class="qr-placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="64" height="64">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                        </svg>
+                        <p>Tu código QR aparecerá aquí</p>
+                    </div>
+                    <div id="qr-output"></div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Generador QR • El código se descarga automáticamente</p>
+        </footer>
+    </div>
+
+    <script src="js/generador.js"></script>
+</body>
+</html>
