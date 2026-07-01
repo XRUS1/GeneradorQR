@@ -1,97 +1,153 @@
-<!DOCTYPE html>
-<html lang="es">
+<!doctype html>
+<!--
+Copyright 2018 The Immersive Web Community Group
+Licensed under the MIT License
+-->
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de QR para URLs</title>
-    <link rel="stylesheet" href="css/estilo.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <meta charset='utf-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
+  <meta name='mobile-web-app-capable' content='yes'>
+  <meta name='apple-mobile-web-app-capable' content='yes'>
+  <link rel='icon' type='image/png' sizes='3232' href='favicon-32x32.png'>
+  <link rel='icon' type='image/png' sizes='96x96' href='favicon-96x96.png'>
+  <link rel='stylesheet' href='css/common.css'>
+  <title>Seguimiento a escala de la habitacion (Magic Window)</title>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                </svg>
-            </div>
-            <h1>Generador QR</h1>
-            <p class="subtitle">Ingresa una URL y genera tu código QR automáticamente</p>
-        </header>
+  <header>
+    <details open>
+      <summary>Escala de habitacion</summary>
+      <p>
+        Haz clic en el botón de abajo para activar los sensores de movimiento de tu teléfono y explorar la escena en 360 grados sin necesidad de cascos.
+        <a class="back" href="./">Back</a>
+      </p>
+    </details>
+  </header>
 
-        <main class="app">
-            <section class="controls">
-                <div class="input-group">
-                    <label for="qr-url">Dirección URL</label>
-                    <input type="url" id="qr-url" placeholder="https://ejemplo.com" required>
-                </div>
+  <script type="module">
+    import { WebXRButton } from './js/util/webxr-button.js';
+    import { Scene } from './js/render/scenes/scene.js';
+    import { Renderer, createWebGLContext } from './js/render/core/renderer.js';
+    import { Gltf2Node } from './js/render/nodes/gltf2.js';
+    import { SkyboxNode } from './js/render/nodes/skybox.js';
+    import { QueryArgs } from './js/util/query-args.js';
 
-                <div class="options-grid">
-                    <div class="input-group">
-                        <label for="qr-size">Tamaño (px)</label>
-                        <input type="number" id="qr-size" value="512" min="100" max="1000" step="10">
-                    </div>
+    // Si se solicita, utilizar polyfill para proveer el soporte de dispositivos móviles
+    import WebXRPolyfill from './js/third-party/webxr-polyfill/build/webxr-polyfill.module.js';
+    if (QueryArgs.getBool('usePolyfill', true)) {
+      let polyfill = new WebXRPolyfill();
+    }
 
-                    <div class="input-group">
-                        <label for="qr-color">Color QR</label>
-                        <div class="color-wrapper">
-                            <input type="color" id="qr-color" value="#1a1a2e">
-                            <span class="color-value">#1a1a2e</span>
-                        </div>
-                    </div>
+    // Variables globales para XR
+    let xrButton = null;
+    let xrSession = null;
+    let xrRefSpace = null;
 
-                    <div class="input-group">
-                        <label for="qr-bg">Fondo</label>
-                        <div class="color-wrapper">
-                            <input type="color" id="qr-bg" value="#ffffff">
-                            <span class="color-value">#ffffff</span>
-                        </div>
-                    </div>
+    // Variables locales de escena para GL.
+    let gl = null;
+    let renderer = null;
+    let scene = new Scene();
 
-                    <div class="input-group">
-                        <label for="qr-level">Corrección</label>
-                        <select id="qr-level">
-                            <option value="1">Baja (L)</option>
-                            <option value="0" selected>Media (M)</option>
-                            <option value="3">Alta (Q)</option>
-                            <option value="2">Máxima (H)</option>
-                        </select>
-                    </div>
-                </div>
+    // Cargando el modelo y entorno idénticos a tus capturas
+    scene.addNode(new Gltf2Node({url: 'media/gltf/camp/camp.gltf'}));
+    scene.addNode(new SkyboxNode({url: 'media/textures/eilenriede-park-2k.png'}));
+    scene.standingStats(true);
 
-                <button id="btn-generate" class="btn-primary">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                        <polyline points="17 6 23 6 23 12"></polyline>
-                    </svg>
-                    Generar y Descargar QR
-                </button>
-            </section>
+    function initXR() {
+      // Configuramos el botón original para pedir la activación del usuario
+      xrButton = new WebXRButton({
+        onRequestSession: onRequestSession,
+        onEndSession: onEndSession,
+        textEnterXR: "INICIAR PANORAMA",
+        textXRNotFound: "XR NO SOPORTADO",
+        textLeaveXR: "SALIR"
+      });
+      document.querySelector('header').appendChild(xrButton.domElement);
 
-            <section class="preview">
-                <div class="preview-card">
-                    <div id="qr-container" class="qr-placeholder">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="64" height="64">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                        </svg>
-                        <p>Tu código QR aparecerá aquí</p>
-                    </div>
-                    <div id="qr-output"></div>
-                </div>
-            </section>
-        </main>
+      if (navigator.xr) {
+        // Comprobamos soporte para modo monoscópico integrado en pantalla ('inline')
+        navigator.xr.isSessionSupported('inline').then((supported) => {
+          xrButton.enabled = supported;
+        });
+      }
+    }
 
-        <footer>
-            <p>Generador QR • El código se descarga automáticamente</p>
-        </footer>
-    </div>
+    // El clic del usuario activa esta función, cumpliendo la regla de seguridad del navegador
+    function onRequestSession() {
+      return navigator.xr.requestSession('inline').then(onSessionStarted);
+    }
 
-    <script src="js/generador.js"></script>
+    function onSessionStarted(session) {
+      xrSession = session;
+      xrButton.setSession(session);
+      session.addEventListener('end', onSessionEnded);
+
+      // Inicializa el contexto de renderizado gráfico
+      initGL();
+
+      let glLayer = new XRWebGLLayer(session, gl);
+      session.updateRenderState({ baseLayer: glLayer });
+
+      // Solicitamos 'local' para ligar la cámara estrictamente al sensor del giroscopio físico
+      session.requestReferenceSpace('local').then((refSpace) => {
+        xrRefSpace = refSpace;
+        session.requestAnimationFrame(onXRFrame);
+      }).catch(() => {
+        // Alternativa si el sistema operativo restringe el modo 'local'
+        session.requestReferenceSpace('viewer').then((refSpace) => {
+          xrRefSpace = refSpace;
+          session.requestAnimationFrame(onXRFrame);
+        });
+      });
+    }
+
+    function initGL() {
+      if (gl) return;
+      gl = createWebGLContext({ xrCompatible: true });
+      document.body.appendChild(gl.canvas);
+
+      onResize();
+      window.addEventListener('resize', onResize);
+
+      renderer = new Renderer(gl);
+      scene.setRenderer(renderer);
+    }
+
+    function onResize() {
+      if (!gl) return;
+      gl.canvas.width = gl.canvas.clientWidth * window.devicePixelRatio;
+      gl.canvas.height = gl.canvas.clientHeight * window.devicePixelRatio;
+    }
+
+    function onEndSession(session) {
+      session.end();
+    }
+
+    function onSessionEnded(event) {
+      xrButton.setSession(null);
+      xrSession = null;
+    }
+
+    function onXRFrame(t, frame) {
+      let session = frame.session;
+      
+      // OBLIGATORIO: Solicitamos la pose usando el espacio de referencia local puro
+      // Esto lee directamente los sensores de rotación del teléfono en vez de gestos táctiles.
+      let pose = frame.getViewerPose(xrRefSpace);
+
+      scene.startFrame();
+      session.requestAnimationFrame(onXRFrame);
+
+      if (pose) {
+        scene.drawXRFrame(frame, pose);
+      }
+
+      scene.endFrame();
+    }
+
+    // Arranca el proceso de inicialización del botón
+    initXR();
+  </script>
 </body>
 </html>
